@@ -1,0 +1,12 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/cmake_install.cmake",
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/extern/cmake_install.cmake",
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/extern/libdivsufsort-gin/cmake_install.cmake",
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/extern/libdivsufsort-gin/pkgconfig/cmake_install.cmake",
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/extern/libdivsufsort-gin/include/cmake_install.cmake",
+		"/Users/ignazio/Desktop/ginTonic/ginTonic/build/extern/libdivsufsort-gin/lib/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

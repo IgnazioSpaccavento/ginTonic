@@ -1,0 +1,2 @@
+/usr/bin/ar qc libdivsufsort64-gin.a "CMakeFiles/divsufsort64-gin.dir/divsufsort.c.o" "CMakeFiles/divsufsort64-gin.dir/sssort.c.o" "CMakeFiles/divsufsort64-gin.dir/trsort.c.o" "CMakeFiles/divsufsort64-gin.dir/utils.c.o"
+/usr/bin/ranlib libdivsufsort64-gin.a

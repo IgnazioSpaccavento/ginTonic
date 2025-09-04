@@ -138,6 +138,117 @@ void gin_gin_init(gin_gin_t** gin, gin_graph_t *graph, gin_vector_t *permutation
     f->dfmi = gin_dfmi_build(graph_encoding->seq, graph_encoding->size, isa_sample_rate);
     gin_dfmi_populate_alphabet(f->dfmi, &f->alphabet, &f->alphabet_size);
     f->no_chars = gin_dfmi_bwt_length(f->dfmi);
+    
+    // STAMPE RANK PER OGNI NODO - COMMENTATE TEMPORANEAMENTE PER EVITARE SEGFAULT
+    /*
+    printf("Single range mapper R_σ0 based on r_σ0\n\n");
+    printf("i/σ0 | Si   | r_σ0(i) | N^-(r_σ0(i)) | R_σ0\n");
+    printf("-----|------|---------|--------------|--------\n");
+    
+    // Creiamo un mapping da vertex ID a BWT rank (r_σ0)
+    gin_vector_t *vertex_to_bwt_rank;
+    gin_vector_init(&vertex_to_bwt_rank, V, &prm_fstruct);
+    vertex_to_bwt_rank->size = V;
+    for(int_t bwt_rank = 0; bwt_rank < V; bwt_rank++) {
+        int_t vertex_id = (int_t)f->bwt_to_vid->data[bwt_rank];
+        vertex_to_bwt_rank->data[vertex_id] = (void*)bwt_rank; // vertex_id ha BWT rank bwt_rank
+    }
+    
+    // Creiamo anche un mapping da vertex ID a posizione nella permutazione (per calcolare R_σ0)
+    gin_vector_t *vertex_to_perm_rank;
+    gin_vector_init(&vertex_to_perm_rank, V, &prm_fstruct);
+    vertex_to_perm_rank->size = V;
+    for(int_t i = 0; i < V; i++) {
+        int_t vertex_id = (int_t)f->permutation->data[i];
+        vertex_to_perm_rank->data[vertex_id] = (void*)i; // vertex_id ha permutation rank i
+    }
+    
+    // Iteriamo sui vertici in ordine di ID (0, 1, 2, 3, 4)
+    for(int_t vertex_id = 0; vertex_id < V; vertex_id++) {
+        gin_vertex_t *vertex = (gin_vertex_t*)graph->vertex_list->data[vertex_id];
+        
+        // Il rank r_σ0(i) di questo vertex (BWT rank tradotto in text rank)
+        int_t bwt_rank = (int_t)vertex_to_bwt_rank->data[vertex_id];
+        int_t rank_sigma0 = bwt_rank; // r_σ0 è il BWT rank
+        
+        // N^-(r_σ0(i)) significa: neighbors in entrata del nodo che si trova alla posizione r_σ0(i)
+        // Se il nodo corrente ha rank_sigma0 = k, allora N^-(k) sono i neighbors del nodo alla posizione k
+        int_t node_at_rank_position = (int_t)f->permutation->data[rank_sigma0];
+        gin_vector_t *incoming_neighbors;
+        bool found = gin_table_lookup(graph->incoming_neighbors, (void*)rank_sigma0, (void*)&incoming_neighbors);
+        
+        // Stampiamo la riga: vertex_id | sequenza | rank | incoming_neighbors | range
+        printf("%4lld | %-4s | %7lld | ", vertex->id, vertex->label->seq, rank_sigma0);
+        
+        // Stampiamo i neighbors in entrata del nodo che si trova alla posizione r_σ0(i)
+        if(found && incoming_neighbors && incoming_neighbors->size > 0) {
+            for(int_t j = 0; j < incoming_neighbors->size; j++) {
+                if(j > 0) printf(",");
+                printf("%lld", (int_t)incoming_neighbors->data[j]);
+            }
+        } else {
+            printf("-");
+        }
+        
+        printf(" | ");
+        // Stampiamo R_σ0(i) = unione dei rank dei neighbors in entrata
+        if(found && incoming_neighbors && incoming_neighbors->size > 0) {
+            // Raccogli i rank dei neighbors
+            int_t *ranks = malloc(incoming_neighbors->size * sizeof(int_t));
+            for(int_t j = 0; j < incoming_neighbors->size; j++) {
+                int_t neighbor_id = (int_t)incoming_neighbors->data[j];
+                ranks[j] = (int_t)vertex_to_perm_rank->data[neighbor_id];
+            }
+            
+            // Ordina i rank
+            for(int_t i = 0; i < incoming_neighbors->size - 1; i++) {
+                for(int_t j = i + 1; j < incoming_neighbors->size; j++) {
+                    if(ranks[i] > ranks[j]) {
+                        int_t temp = ranks[i];
+                        ranks[i] = ranks[j];
+                        ranks[j] = temp;
+                    }
+                }
+            }
+            
+            // Unisci intervalli contigui
+            int_t start = ranks[0];
+            int_t end = ranks[0];
+            bool first = true;
+            
+            for(int_t j = 1; j < incoming_neighbors->size; j++) {
+                if(ranks[j] == end + 1) {
+                    // Intervallo contiguo, estendi
+                    end = ranks[j];
+                } else {
+                    // Stampa l'intervallo corrente
+                    if(!first) printf(",");
+                    if(start == end) {
+                        printf("[%lld,%lld]", start, end);
+                    } else {
+                        printf("[%lld,%lld]", start, end);
+                    }
+                    first = false;
+                    start = end = ranks[j];
+                }
+            }
+            
+            // Stampa l'ultimo intervallo
+            if(!first) printf(",");
+            printf("[%lld,%lld]", start, end);
+            
+            free(ranks);
+        } else {
+            printf("-");
+        }
+        printf("\n");
+    }
+    printf("\n");
+    
+    // Liberiamo i vector temporanei
+    gin_vector_free(vertex_to_bwt_rank);
+    gin_vector_free(vertex_to_perm_rank);
+    */
 #elif defined GIN_SDSL
     f->graph_fmi = csa_wt_build(graph_encoding->seq, graph_encoding->size);
     csa_wt_populate_alphabet(f->graph_fmi, &f->alphabet, &f->alphabet_size);
@@ -294,6 +405,109 @@ void gin_gin_init(gin_gin_t** gin, gin_graph_t *graph, gin_vector_t *permutation
     }
     f->bwt_to_vid = c_0_bwt_to_text;
     gin_vector_free(c_1_text_to_bwt);
+    
+    // STAMPE RANK PER OGNI NODO
+    printf("Single range mapper R_σ0 based on r_σ0\n\n");
+    printf("i/σ0 | Si   | r_σ0(i) | N^-(r_σ0(i)) | R_σ0\n");
+    printf("-----|------|---------|--------------|--------\n");
+    
+    // Creiamo un mapping da vertex ID a BWT rank (r_σ0)
+    gin_vector_t *vertex_to_bwt_rank;
+    gin_vector_init(&vertex_to_bwt_rank, V, &prm_fstruct);
+    vertex_to_bwt_rank->size = V;
+    for(int_t bwt_rank = 0; bwt_rank < V; bwt_rank++) {
+        int_t vertex_id = (int_t)f->bwt_to_vid->data[bwt_rank];
+        vertex_to_bwt_rank->data[vertex_id] = (void*)bwt_rank; // vertex_id ha BWT rank bwt_rank
+    }
+    
+    // Creiamo anche un mapping da vertex ID a posizione nella permutazione (per calcolare R_σ0)
+    gin_vector_t *vertex_to_perm_rank;
+    gin_vector_init(&vertex_to_perm_rank, V, &prm_fstruct);
+    vertex_to_perm_rank->size = V;
+    for(int_t i = 0; i < V; i++) {
+        int_t vertex_id = (int_t)f->permutation->data[i];
+        vertex_to_perm_rank->data[vertex_id] = (void*)i; // vertex_id ha permutation rank i
+    }
+    
+    // Iteriamo sui vertici in ordine di ID (0, 1, 2, 3, 4)
+    for(int_t vertex_id = 0; vertex_id < V; vertex_id++) {
+        gin_vertex_t *vertex = (gin_vertex_t*)graph->vertex_list->data[vertex_id];
+        
+        // Il rank r_σ0(i) di questo vertex (BWT rank)
+        int_t bwt_rank = (int_t)vertex_to_bwt_rank->data[vertex_id];
+        int_t rank_sigma0 = bwt_rank; // r_σ0 è il BWT rank
+        
+        // N^-(r_σ0(i)) significa: neighbors in entrata del nodo con ID = r_σ0(i)
+        gin_vector_t *incoming_neighbors;
+        bool found = gin_table_lookup(graph->incoming_neighbors, (void*)rank_sigma0, (void*)&incoming_neighbors);
+        
+        // Stampiamo la riga: vertex_id | sequenza | BWT_rank | incoming_neighbors | R_σ0
+        printf("%4lld | %-4s | %7lld | ", vertex->id, vertex->label->seq, rank_sigma0);
+        
+        // Stampiamo i neighbors in entrata del nodo con ID = r_σ0(i)
+        if(found && incoming_neighbors && incoming_neighbors->size > 0) {
+            for(int_t j = 0; j < incoming_neighbors->size; j++) {
+                if(j > 0) printf(",");
+                printf("%lld", (int_t)incoming_neighbors->data[j]);
+            }
+        } else {
+            printf("-");
+        }
+        
+        printf(" | ");
+        // Stampiamo R_σ0(i) = unione dei rank dei neighbors in entrata
+        if(found && incoming_neighbors && incoming_neighbors->size > 0) {
+            // Raccogli i rank dei neighbors
+            int_t *ranks = malloc(incoming_neighbors->size * sizeof(int_t));
+            for(int_t j = 0; j < incoming_neighbors->size; j++) {
+                int_t neighbor_id = (int_t)incoming_neighbors->data[j];
+                ranks[j] = (int_t)vertex_to_perm_rank->data[neighbor_id];
+            }
+            
+            // Ordina i rank
+            for(int_t i = 0; i < incoming_neighbors->size - 1; i++) {
+                for(int_t j = i + 1; j < incoming_neighbors->size; j++) {
+                    if(ranks[i] > ranks[j]) {
+                        int_t temp = ranks[i];
+                        ranks[i] = ranks[j];
+                        ranks[j] = temp;
+                    }
+                }
+            }
+            
+            // Unisci intervalli contigui
+            int_t start = ranks[0];
+            int_t end = ranks[0];
+            bool first = true;
+            
+            for(int_t j = 1; j < incoming_neighbors->size; j++) {
+                if(ranks[j] == end + 1) {
+                    // Intervallo contiguo, estendi
+                    end = ranks[j];
+                } else {
+                    // Stampa l'intervallo corrente
+                    if(!first) printf(",");
+                    printf("[%lld,%lld]", start, end);
+                    first = false;
+                    start = end = ranks[j];
+                }
+            }
+            
+            // Stampa l'ultimo intervallo
+            if(!first) printf(",");
+            printf("[%lld,%lld]", start, end);
+            
+            free(ranks);
+        } else {
+            printf("-");
+        }
+        printf("\n");
+    }
+    printf("\n");
+    
+    // Liberiamo i vector temporanei
+    gin_vector_free(vertex_to_bwt_rank);
+    gin_vector_free(vertex_to_perm_rank);
     /******************************************************
     * Step 3d - Now, actually construct the tree
     ******************************************************/
