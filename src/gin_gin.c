@@ -129,6 +129,19 @@ void gin_gin_init(gin_gin_t** gin, gin_graph_t *graph, gin_vector_t *permutation
         int_t pcode_idx = (int_t) inverse_permutation->data[i];
         gin_string_concat_mut(graph_encoding, (gin_string_t *) (cwords->data[pcode_idx]));
     }
+    
+    // Stampa la stringa di codifica del grafo
+    printf("\n=== GRAPH ENCODING STRING ===\n");
+    
+    // Stampa anche una versione più leggibile con separatori
+    for(int_t i = 0; i < V; i++) {
+        gin_vertex_t *vertex = (gin_vertex_t*)graph->vertex_list->data[i];
+        int_t pcode_idx = (int_t) inverse_permutation->data[i];
+        gin_string_t *pcode = (gin_string_t*)(cwords->data[pcode_idx]);
+        printf("V%lld: %c%s%c%s | ", vertex->id, c_0, vertex->label->seq, c_1, pcode->seq);
+    }
+    printf("\n\n");
+    
     // free obsolete stuff
     /**************************************************************************
     * Step 2 - Compute the suffix array of the encoding and build an FMI
@@ -515,6 +528,10 @@ void gin_gin_init(gin_gin_t** gin, gin_graph_t *graph, gin_vector_t *permutation
     gin_imt_t *inverval_merge_tree;
     gin_imt_init(&inverval_merge_tree, V, kv_pairs);
     f->r2r_tree = inverval_merge_tree;
+    
+    // Stampa l'albero di Interval Merge Tree
+    printf("\n=== INTERVAL MERGE TREE ===\n");
+    gin_imt_print(inverval_merge_tree);
     #ifdef GIN_ORACLE
     int_t *alphabet;
     int_t alphabet_size;

@@ -78,6 +78,9 @@ void gin_imt_query_helper(gin_imt_node_t *node, int_t lo, int_t hi, int_t no_max
 void gin_imt_query_legacy(gin_imt_t *i, int_t start, int_t end, gin_vector_t **intervals);
 gin_vector_t *gin_imt_query_helper_legacy(gin_imt_node_t *node, int_t lo, int_t hi);
 
+void gin_imt_print(gin_imt_t *i);
+void gin_imt_print_helper(gin_imt_node_t *node, int depth);
+
 void gin_imt_init_compact_intervals(gin_vector_t *intervals, gin_vector_t **compacted);
 gin_imt_node_t *gin_imt_init_helper(int_t lo, int_t hi, gin_vector_t *kv_interval_pairs);
 void gin_imt_free_helper(gin_imt_node_t *node);

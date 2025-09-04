@@ -309,6 +309,55 @@ void gin_imt_free_helper(gin_imt_node_t *node) {
     }
 }
 
+void gin_imt_print(gin_imt_t *i) {
+    if(!i) {
+        printf("IMT: NULL\n");
+        return;
+    }
+    printf("Interval Merge Tree (no_keys=%lld):\n", i->no_keys);
+    gin_imt_print_helper(i->root, 0);
+    printf("\n");
+}
+
+void gin_imt_print_helper(gin_imt_node_t *node, int depth) {
+    if(!node) return;
+    
+    // Stampa indentazione
+    for(int i = 0; i < depth; i++) {
+        printf("  ");
+    }
+    
+    // Stampa informazioni del nodo
+    printf("Node [%lld,%lld] -> intervals: ", node->lo, node->hi);
+    
+    if(node->intervals && node->intervals->size > 0) {
+        printf("{");
+        for(int_t i = 0; i < node->intervals->size; i++) {
+            gin_imt_interval_t *interval = (gin_imt_interval_t*)node->intervals->data[i];
+            if(i > 0) printf(", ");
+            printf("[%lld,%lld]", interval->lo, interval->hi);
+        }
+        printf("}");
+    } else {
+        printf("{}");
+    }
+    printf("\n");
+    
+    // Stampa figli
+    if(node->left || node->right) {
+        if(node->left) {
+            for(int i = 0; i < depth; i++) printf("  ");
+            printf("├─ Left:\n");
+            gin_imt_print_helper((gin_imt_node_t*)node->left, depth + 1);
+        }
+        if(node->right) {
+            for(int i = 0; i < depth; i++) printf("  ");
+            printf("└─ Right:\n");
+            gin_imt_print_helper((gin_imt_node_t*)node->right, depth + 1);
+        }
+    }
+}
+
 gin_vector_t *gin_imt_merge_intervals(gin_vector_t *i1, gin_vector_t *i2) {
     gin_vector_t *result;
     gin_vector_init(&result, i1->size + i2->size, &gin_fstruct_imt_interval);
