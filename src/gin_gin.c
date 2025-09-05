@@ -708,10 +708,26 @@ void gin_gin_query_find_dfs_process_fork(gin_gin_t *gin, gin_fork_node_t *fork, 
         gin_fork_node_free(fork);
         return;
     }
+    
+    printf("\n=== DFS FORK PROCESSING DEBUG ===\n");
+    printf("Processing fork: [%lld, %lld) at position %lld for pattern '%s'\n", 
+           fork->sa_lo, fork->sa_hi, fork->pos, pattern->seq);
+    
     while (fork->pos > -1) {
         int_t c_0_lo, c_0_hi;
+        
+        printf("\n--- DFS Step at position %lld ---\n", fork->pos);
+        printf("Current fork: [%lld, %lld)\n", fork->sa_lo, fork->sa_hi);
+        printf("Character at position %lld: '%c'\n", fork->pos, 
+               fork->pos >= 0 && fork->pos < (int_t)pattern->size ? pattern->seq[fork->pos] : '?');
+        
         bool okc = gin_gin_advance_fork(gin, fork, pattern);
+        printf("After advance: [%lld, %lld) (okc=%s)\n", fork->sa_lo, fork->sa_hi, okc ? "true" : "false");
+        
         bool ok = gin_gin_fork_precedence_range(gin, fork, gin->c_0, &c_0_lo, &c_0_hi);
+        printf("Precedence range for c_0='%c': [%lld, %lld) (size=%lld)\n", 
+               gin->c_0, c_0_lo, c_0_hi, c_0_hi - c_0_lo);
+        
         if (fork->pos == -1) break;
         if (c_0_hi > c_0_lo) {
             // we have a walk having the current suffix of the query as a prefix
@@ -719,13 +735,23 @@ void gin_gin_query_find_dfs_process_fork(gin_gin_t *gin, gin_fork_node_t *fork, 
                                                              fork->pos,
                                                              MAIN);
             gin_vector_t *incoming_sa_intervals;
+            
+            printf("Querying IMT with range [%lld, %lld]\n", c_0_lo - 1, c_0_hi - 2);
+            
             #ifdef GIN_ORACLE
             gin_oimt_query(gin->oracle_r2r, c_0_lo - 1, c_0_hi - 2, pattern->seq[fork->pos], max_forks, &incoming_sa_intervals);
             #else
             gin_imt_query(gin->r2r_tree, c_0_lo - 1, c_0_hi - 2, max_forks, &incoming_sa_intervals);
             #endif
+            
+            printf("IMT returned %lld R intervals:\n", incoming_sa_intervals->size);
+            
             for (int_t i = 0; i < incoming_sa_intervals->size; i++) {
                 gin_imt_interval_t *interval = incoming_sa_intervals->data[i];
+                printf("  R[%lld]: [%lld, %lld] -> SA range [%lld, %lld)\n", 
+                       i, interval->lo, interval->hi, 
+                       V+1+interval->lo, V+2+interval->hi);
+                
                 gin_fork_node_t *new_fork = gin_fork_node_init(V+1+interval->lo, V+2+interval->hi,
                                                                fork->pos, MAIN);
                 // fire subtask
@@ -734,9 +760,13 @@ void gin_gin_query_find_dfs_process_fork(gin_gin_t *gin, gin_fork_node_t *fork, 
             }
             fork = royal_node;
             gin_vector_free(incoming_sa_intervals);
+        } else {
+            printf("No precedence range found, continuing with current fork\n");
         }
         if (!okc || fork->sa_lo == fork->sa_hi) {
             fork->type = DEAD;
+            printf("Fork died: okc=%s, range_empty=%s\n", okc ? "true" : "false", 
+                   (fork->sa_lo == fork->sa_hi) ? "true" : "false");
             break;
         }
     }
@@ -770,6 +800,11 @@ void gin_gin_query_find_dfs_process_fork(gin_gin_t *gin, gin_fork_node_t *fork, 
 void gin_gin_query_find_step(gin_gin_t *gin, gin_string_t *string, int_t max_forks, int_t *t, gin_vector_t **cur_forks, gin_vector_t **partial_matches, gin_gin_stats_t *stats) {
     gin_vector_t *forks= *cur_forks;
     int_t V = gin->permutation->size;
+    
+    printf("\n=== FORK & COMPACT PHASE DEBUG ===\n");
+    printf("Query: %s (position t=%lld)\n", string->seq, *t);
+    printf("Current forks count: %lld\n", forks->size);
+    
     /**********************************************************************
     * Step 1 - Forking phase: Fork each query at its current position
     **********************************************************************/
@@ -779,18 +814,38 @@ void gin_gin_query_find_step(gin_gin_t *gin, gin_string_t *string, int_t max_for
     for (int_t i = 0; i < forks->size; i++) {
         gin_fork_node_t *fork = forks->data[i];
         int_t c_0_lo, c_0_hi;
+        
+        printf("\n--- Fork %lld ---\n", i);
+        printf("  Current fork range: [%lld, %lld) at position %lld\n", fork->sa_lo, fork->sa_hi, fork->pos);
+        
         gin_gin_fork_precedence_range(gin, fork, gin->c_0, &c_0_lo, &c_0_hi);
+        
+        printf("  Precedence range for c_0='%c': [%lld, %lld)\n", gin->c_0, c_0_lo, c_0_hi);
+        printf("  Range size: %lld\n", c_0_hi - c_0_lo);
+        
         bool more_to_track = max_forks == -1 || max_forks > forks->size;
         if(more_to_track && c_0_lo < c_0_hi) {
             gin_vector_t *incoming_sa_intervals;
+            
+            printf("  Querying IMT with range [%lld, %lld]\n", c_0_lo - 1, c_0_hi - 2);
+            
             #ifdef GIN_ORACLE
             gin_oimt_query(gin->oracle_r2r, c_0_lo - 1, c_0_hi - 2, string->seq[fork->pos], max_forks, &incoming_sa_intervals);
             #else
             gin_imt_query(gin->r2r_tree, c_0_lo - 1, c_0_hi - 2, max_forks, &incoming_sa_intervals);
             #endif
+            
+            printf("  IMT returned %lld intervals (R ranges):\n", incoming_sa_intervals->size);
+            
             int_t no_forks_to_add = max_forks == -1 ? incoming_sa_intervals->size : MIN2(max_forks - forks->size, incoming_sa_intervals->size);
+            
             for (int_t j = 0; j < no_forks_to_add; j++) {
                 gin_imt_interval_t *interval = incoming_sa_intervals->data[j];
+                
+                printf("    R[%lld]: [%lld, %lld] -> SA range [%lld, %lld)\n", 
+                       j, interval->lo, interval->hi, 
+                       V+1+interval->lo, V+2+interval->hi);
+                
                 gin_fork_node_t *new_fork = gin_fork_node_init(V+1+interval->lo, V+2+interval->hi,
                                                                fork->pos,
                                                                MAIN);
@@ -799,34 +854,84 @@ void gin_gin_query_find_step(gin_gin_t *gin, gin_string_t *string, int_t max_for
                 gin_vector_append(new_forks, new_fork);
                 //}
             }
+            
+            printf("  Total new forks created: %lld\n", no_forks_to_add);
             gin_vector_free(incoming_sa_intervals);
+        } else {
+            if(!more_to_track) {
+                printf("  Skipping fork creation (max_forks limit reached)\n");
+            } else {
+                printf("  No precedence range found (c_0_lo >= c_0_hi)\n");
+            }
         }
     }
+    
+    printf("\nBefore compaction: %lld new forks\n", new_forks->size);
+    
+    // Stampa i forks prima della compattazione
+    if(new_forks->size > 0) {
+        printf("New forks before compaction:\n");
+        for(int_t i = 0; i < new_forks->size; i++) {
+            gin_fork_node_t *fork = new_forks->data[i];
+            printf("  Fork[%lld]: [%lld, %lld)\n", i, fork->sa_lo, fork->sa_hi);
+        }
+    }
+    
     /**********************************************************************
     * Step 2 - Merge phase: merge overlapping ranges on the vertices
     **********************************************************************/
     gin_vector_t *merged;
     gin_gin_compact_forks(gin, new_forks, &merged);
+    
+    printf("After compaction: %lld merged forks\n", merged->size);
+    
+    // Stampa i forks dopo la compattazione
+    if(merged->size > 0) {
+        printf("Merged forks after compaction:\n");
+        for(int_t i = 0; i < merged->size; i++) {
+            gin_fork_node_t *fork = merged->data[i];
+            printf("  Merged[%lld]: [%lld, %lld)\n", i, fork->sa_lo, fork->sa_hi);
+        }
+    }
+    
     gin_vector_free(new_forks);
     /**********************************************************************
     * Step 3 - Advance Phase: advance each fork once
     **********************************************************************/
     gin_vector_t *next_iter_forks;
     gin_vector_init(&next_iter_forks, forks->size + merged->size, &gin_fstruct_fork_node);
+    
+    printf("\n--- Advance Phase ---\n");
+    printf("Advancing %lld original forks and %lld merged forks\n", forks->size, merged->size);
+    printf("Target character at position %lld: '%c'\n", 
+           (*t > 0 && *t <= (int_t)string->size) ? *t-1 : -1,
+           (*t > 0 && *t <= (int_t)string->size) ? string->seq[*t-1] : '?');
+    
+    int_t original_alive = 0, merged_alive = 0;
+    int_t original_dead = 0, merged_dead = 0;
+    
     // advance and filter previous queries
     //#pragma omp parallel for default(none) shared(forks, gin, partial_matches, next_iter_forks, string, t)
     for(int_t i = 0; i < forks->size; i++) {
         gin_fork_node_t *fork = forks->data[i];
+        int_t old_lo = fork->sa_lo, old_hi = fork->sa_hi;
+        
         gin_gin_advance_fork(gin, fork, string);
+        
         if(fork->sa_lo >= fork->sa_hi) { // query died while advancing
             fork->type = DEAD;
+            original_dead++;
+            printf("  Original[%lld]: [%lld,%lld) -> DEAD (no matches)\n", i, old_lo, old_hi);
             //#pragma omp critical(partial_matches_append)
             //{
             gin_vector_append(*partial_matches, fork);
             //}
         } else {
+            original_alive++;
+            printf("  Original[%lld]: [%lld,%lld) -> [%lld,%lld) ALIVE\n", i, old_lo, old_hi, fork->sa_lo, fork->sa_hi);
             if(*t==1) {
                 fork->type = LEAF;
+                printf("    -> Marked as LEAF (t=1)\n");
             }
             //#pragma omp critical(next_iter_queries_append)
             //{
@@ -834,24 +939,36 @@ void gin_gin_query_find_step(gin_gin_t *gin, gin_string_t *string, int_t max_for
             //}
         }
     }
+    
     // advance and filter next forks
     //#pragma omp parallel for default(none) shared(merged,V,gin,string,partial_matches,next_iter_forks, t)
     for (int_t i = 0; i < merged->size; i++) {
         gin_fork_node_t *fork = merged->data[i];
+        int_t old_lo = fork->sa_lo, old_hi = fork->sa_hi;
+        
         gin_gin_advance_fork(gin, fork, string);
+        
         if (fork->sa_lo >= fork->sa_hi) { // query died while advancing
             fork->type = DEAD;
+            merged_dead++;
+            printf("  Merged[%lld]: [%lld,%lld) -> DEAD (no matches)\n", i, old_lo, old_hi);
             //#pragma omp critical(partial_matches_append)
             //{
             gin_vector_append(*partial_matches, fork);
             //}
         } else {
+            merged_alive++;
+            printf("  Merged[%lld]: [%lld,%lld) -> [%lld,%lld) ALIVE\n", i, old_lo, old_hi, fork->sa_lo, fork->sa_hi);
             //#pragma omp critical(next_iter_queries_append)
             //{
             gin_vector_append(next_iter_forks, fork);
             //}
         }
     }
+    
+    printf("Advance results: Original (%lld alive, %lld dead), Merged (%lld alive, %lld dead)\n", 
+           original_alive, original_dead, merged_alive, merged_dead);
+    printf("Total forks for next iteration: %lld\n", next_iter_forks->size);
     stats->no_calls_to_advance_fork += forks->size + merged->size;
     stats->no_calls_to_precedence_range += forks->size;
     gin_vector_free_disown(merged);
@@ -879,14 +996,27 @@ void gin_gin_query_find_bootstrapped(gin_gin_t *gin, gin_vector_t *bootstrap, in
     gin_vector_t *partial_matches;
     gin_vector_init(&partial_matches, GIN_VECTOR_INIT_SIZE, &gin_fstruct_fork_node);
 
+    printf("\n=== BOOTSTRAPPED QUERY DEBUG ===\n");
+    printf("Bootstrap depth: %lld, Initial forks: %lld\n", bootstrap_depth, forks->size);
+    
     int_t t = bootstrap_depth; // stores the position last matched
+    int_t iteration = 0;
     while(forks->size && t > 0) {
+        printf("\n--- Iteration %lld (t=%lld) ---\n", iteration++, t);
+        printf("Forks before step: %lld\n", forks->size);
+        
 #ifdef GIN_DNA_FMI_DR
+        printf("Using double rank step\n");
         gin_gin_query_find_step_double_rank(gin, string, max_forks, &t, &forks, &partial_matches, stats);
 #else
+        printf("Using standard step\n");
         gin_gin_query_find_step(gin, string, max_forks, &t, &forks, &partial_matches, stats);
 #endif
+        
+        printf("Forks after step: %lld, Partial matches: %lld\n", forks->size, partial_matches->size);
     }
+    
+    printf("Bootstrap loop finished: forks=%lld, t=%lld\n", forks->size, t);
     /* experimental */
     // compact forks one more time to prevent the reporting of duplicate matches
     //gin_vector_t *compacted;
@@ -910,7 +1040,13 @@ void gin_gin_query_find(gin_gin_t *gin,
     gin_vector_t *forks = NULL;
     int_t bootstrap_depth = -1;
     *stats = calloc(1, sizeof(gin_gin_stats_t));
+    
+    printf("\n=== MAIN QUERY FIND DEBUG ===\n");
+    printf("Query: '%s', max_forks: %lld, cache: %s\n", 
+           string->seq, max_forks, cache ? "YES" : "NO");
+    
     if(!cache) {
+        printf("Using default bootstrap (no cache)\n");
         // no cache: default bootstrap
         //data structures to keep track of forks
         gin_vector_init(&forks, GIN_VECTOR_INIT_SIZE, &gin_fstruct_fork_node);
@@ -950,7 +1086,10 @@ void gin_gin_query_find(gin_gin_t *gin,
         gin_string_free(cached_suffix);
         forks = bootstrap;
     }
+    
+    printf("Calling gin_gin_query_find_bootstrapped with bootstrap_depth=%lld\n", bootstrap_depth);
     gin_gin_query_find_bootstrapped(gin, forks, bootstrap_depth, string, max_forks, paths, dead_ends, *stats);
+    printf("Query completed. Paths: %lld, Dead ends: %lld\n", (*paths)->size, (*dead_ends)->size);
 }
 
 void gin_gin_compact_forks(gin_gin_t *gin, gin_vector_t *forks, gin_vector_t **merged_forks) {
@@ -1781,6 +1920,11 @@ bool gin_gin_fork_precedence_range(gin_gin_t *gin, gin_fork_node_t *fork, char_t
 void gin_gin_query_find_step_double_rank(gin_gin_t *gin, gin_string_t *string, int_t max_forks, int_t *t, gin_vector_t **cur_forks, gin_vector_t **partial_matches, gin_gin_stats_t *stats) {
     gin_vector_t *forks= *cur_forks;
     int_t V = gin->permutation->size;
+    
+    printf("\n=== DOUBLE RANK FORK & COMPACT DEBUG ===\n");
+    printf("Query: %s (position t=%lld)\n", string->seq, *t);
+    printf("Current forks count: %lld\n", forks->size);
+    
     /**********************************************************************
     * Step 1 - Fork and advance with double rank
     **********************************************************************/
@@ -1789,31 +1933,85 @@ void gin_gin_query_find_step_double_rank(gin_gin_t *gin, gin_string_t *string, i
     for (int_t i = 0; i < forks->size; i++) {
         gin_fork_node_t *fork = forks->data[i];
         int_t c_0_lo, c_0_hi;
+        
+        printf("\n--- Double Rank Fork %lld ---\n", i);
+        printf("  Current fork range: [%lld, %lld) at position %lld\n", fork->sa_lo, fork->sa_hi, fork->pos);
+        printf("  Character at position %lld: '%c'\n", fork->pos, 
+               fork->pos >= 0 && fork->pos < (int_t)string->size ? string->seq[fork->pos] : '?');
+        
         gin_gin_advance_fork_double_rank(gin, fork, string, &c_0_lo, &c_0_hi);
+        
+        printf("  After double rank advance: fork=[%lld, %lld), precedence=[%lld, %lld)\n", 
+               fork->sa_lo, fork->sa_hi, c_0_lo, c_0_hi);
+        printf("  Precedence range size: %lld\n", c_0_hi - c_0_lo);
+        
         bool more_to_track = max_forks == -1 || max_forks > forks->size;
         if(more_to_track && c_0_lo < c_0_hi) {
             gin_vector_t *incoming_sa_intervals;
+            
+            printf("  Querying IMT with range [%lld, %lld]\n", c_0_lo - 1, c_0_hi - 2);
+            
 #ifdef GIN_ORACLE
             gin_oimt_query(gin->oracle_r2r, c_0_lo - 1, c_0_hi - 2, string->seq[fork->pos], max_forks, &incoming_sa_intervals);
 #else
             gin_imt_query(gin->r2r_tree, c_0_lo - 1, c_0_hi - 2, max_forks, &incoming_sa_intervals);
 #endif
+            
+            printf("  IMT returned %lld intervals (R ranges):\n", incoming_sa_intervals->size);
+            
             int_t no_forks_to_add = max_forks == -1 ? incoming_sa_intervals->size : MIN2(max_forks - forks->size, incoming_sa_intervals->size);
             for (int_t j = 0; j < no_forks_to_add; j++) {
                 gin_imt_interval_t *interval = incoming_sa_intervals->data[j];
+                
+                printf("    R[%lld]: [%lld, %lld] -> SA range [%lld, %lld) (pos=%lld)\n", 
+                       j, interval->lo, interval->hi, 
+                       V+1+interval->lo, V+2+interval->hi, fork->pos+1);
+                
                 gin_fork_node_t *new_fork = gin_fork_node_init(V+1+interval->lo, V+2+interval->hi,
                                                                fork->pos+1, // take from previous position when double rank
                                                                MAIN);
                 gin_vector_append(new_forks, new_fork);
             }
+            
+            printf("  Total new forks created: %lld\n", no_forks_to_add);
             gin_vector_free(incoming_sa_intervals);
+        } else {
+            if(!more_to_track) {
+                printf("  Skipping fork creation (max_forks limit reached)\n");
+            } else {
+                printf("  No precedence range found (c_0_lo >= c_0_hi)\n");
+            }
         }
     }
+    
+    printf("\nBefore compaction: %lld new forks\n", new_forks->size);
+    
+    // Stampa i forks prima della compattazione
+    if(new_forks->size > 0) {
+        printf("New forks before compaction:\n");
+        for(int_t i = 0; i < new_forks->size; i++) {
+            gin_fork_node_t *fork = new_forks->data[i];
+            printf("  Fork[%lld]: [%lld, %lld)\n", i, fork->sa_lo, fork->sa_hi);
+        }
+    }
+    
     /**********************************************************************
     * Step 2 - Merge phase: merge overlapping ranges on the vertices
     **********************************************************************/
     gin_vector_t *merged;
     gin_gin_compact_forks(gin, new_forks, &merged);
+    
+    printf("After compaction: %lld merged forks\n", merged->size);
+    
+    // Stampa i forks dopo la compattazione
+    if(merged->size > 0) {
+        printf("Merged forks after compaction:\n");
+        for(int_t i = 0; i < merged->size; i++) {
+            gin_fork_node_t *fork = merged->data[i];
+            printf("  Merged[%lld]: [%lld, %lld)\n", i, fork->sa_lo, fork->sa_hi);
+        }
+    }
+    
     gin_vector_free(new_forks);
     /**********************************************************************
     * Step 3 - Advance Phase: advance each fork once
@@ -1857,27 +2055,62 @@ void gin_gin_advance_fork_double_rank(gin_gin_t *gin, gin_fork_node_t *fork, gin
     char c1 = pattern->seq[fork->pos];
     char c2 = gin->c_0;
 
+    printf("\n    === PRECEDENCE RANGE CALCULATION DEBUG ===\n");
+    printf("    Input fork: [%lld, %lld) at position %lld\n", fork->sa_lo, fork->sa_hi, fork->pos);
+    printf("    Characters: c1='%c' (pattern), c2='%c' (c_0)\n", c1, c2);
+
     int64_t rank_lo_m_1 = 0;
     int64_t rank_hi_m_1 = 0;
     int64_t rank_c0_lo_m_1 = 0;
     int64_t rank_c0_hi_m_1 = 0;
 
     if(fork->sa_lo) {
+        printf("    Computing double rank at position %lld-1 = %lld\n", fork->sa_lo, fork->sa_lo - 1);
         gin_dfmi_double_rank(dfmi, fork->sa_lo - 1, c1, c2, &rank_lo_m_1, &rank_c0_lo_m_1);
+        printf("      rank_lo_m_1(c1='%c') = %lld\n", c1, rank_lo_m_1);
+        printf("      rank_c0_lo_m_1(c2='%c') = %lld\n", c2, rank_c0_lo_m_1);
+    } else {
+        printf("    sa_lo = 0, using rank = 0\n");
     }
+    
     if(fork->sa_hi) {
+        printf("    Computing double rank at position %lld-1 = %lld\n", fork->sa_hi, fork->sa_hi - 1);
         gin_dfmi_double_rank(dfmi, fork->sa_hi - 1, c1, c2, &rank_hi_m_1, &rank_c0_hi_m_1);
+        printf("      rank_hi_m_1(c1='%c') = %lld\n", c1, rank_hi_m_1);
+        printf("      rank_c0_hi_m_1(c2='%c') = %lld\n", c2, rank_c0_hi_m_1);
+    } else {
+        printf("    sa_hi = 0, using rank = 0\n");
     }
 
     uint64_t base    = gin_dfmi_char_sa_base(dfmi,c1);
     uint64_t base_c0 = gin_dfmi_char_sa_base(dfmi,c2);
+    
+    printf("    Character bases in sorted F array:\n");
+    printf("      base(c1='%c') = %lld\n", c1, base);
+    printf("      base_c0(c2='%c') = %lld\n", c2, base_c0);
 
-    fork->sa_lo = (int_t)(base + rank_lo_m_1);
-    fork->sa_hi = (int_t)(base + rank_hi_m_1);
+    // Calcola i nuovi range
+    int_t new_sa_lo = (int_t)(base + rank_lo_m_1);
+    int_t new_sa_hi = (int_t)(base + rank_hi_m_1);
+    int_t new_prec_lo = (int_t)(base_c0 + rank_c0_lo_m_1);
+    int_t new_prec_hi = (int_t)(base_c0 + rank_c0_hi_m_1);
+    
+    printf("    Calculations:\n");
+    printf("      new_sa_lo = base(c1) + rank_lo_m_1 = %lld + %lld = %lld\n", base, rank_lo_m_1, new_sa_lo);
+    printf("      new_sa_hi = base(c1) + rank_hi_m_1 = %lld + %lld = %lld\n", base, rank_hi_m_1, new_sa_hi);
+    printf("      prec_lo = base_c0 + rank_c0_lo_m_1 = %lld + %lld = %lld\n", base_c0, rank_c0_lo_m_1, new_prec_lo);
+    printf("      prec_hi = base_c0 + rank_c0_hi_m_1 = %lld + %lld = %lld\n", base_c0, rank_c0_hi_m_1, new_prec_hi);
+
+    fork->sa_lo = new_sa_lo;
+    fork->sa_hi = new_sa_hi;
     --fork->pos;
 
-    *lo = (int_t)(base_c0 + rank_c0_lo_m_1);
-    *hi = (int_t)(base_c0 + rank_c0_hi_m_1);
+    *lo = new_prec_lo;
+    *hi = new_prec_hi;
+    
+    printf("    Results:\n");
+    printf("      Updated fork: [%lld, %lld) at position %lld\n", fork->sa_lo, fork->sa_hi, fork->pos);
+    printf("      Precedence range: [%lld, %lld) (size=%lld)\n", *lo, *hi, *hi - *lo);
 }
 #endif
 

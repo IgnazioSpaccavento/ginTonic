@@ -1,0 +1,23 @@
+AAT:(c:3):(mf:2,pf:1):(a:5)
+[gin:query] Parsing reference index into data structures.
+[gin:query] Parsing and launching queries with 1 threads and 8 batch size.
+[gin:query] Params: Index file name (-r): res/graph_index_debug.gini
+[gin:query] Params: Query file name (-i): res/query.ginq
+[gin:query] Params: Read batch size (-b): 8
+[gin:query] Params: Threads (-j): 1
+[gin:query] Params: Maximum forks tracked (-m): -1
+[gin:query] Params: Maximum matches decoded (-M): -1
+[gin:query] Params: Cache path: (-C): (null)
+[gin:query] Index: Index parse time (s): 0.000096
+[gin:query] Find: Total queries processed: 1
+[gin:query] Find: Total querying time (s): 0.000003
+[gin:query] Find: Queries per second: 333333.333333
+[gin:query] Find: Time per query (s): 0.000003
+[gin:query] Find: Number of matching forks: 2
+[gin:query] Find: Number of partial forks: 1
+[gin:query] Find: Number of matches: 3
+[gin:query] Find: Number of fork advances: 5
+[gin:query] Find: Number of fork advances per query: 5.000000
+	(30,31)
+	(28,30)
+exit();

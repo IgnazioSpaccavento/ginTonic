@@ -1,0 +1,43 @@
+[gin:query] Parsing reference index into data structures.
+[gin:query] Parsing and launching queries with 1 threads and 8 batch size.
+[gin:query] Params: Index file name (-r): res/graph_index_debug.gini
+[gin:query] Params: Query file name (-i): res/query.ginq
+[gin:query] Params: Read batch size (-b): 8
+[gin:query] Params: Threads (-j): 1
+[gin:query] Params: Maximum forks tracked (-m): -1
+[gin:query] Params: Maximum matches decoded (-M): -1
+[gin:query] Params: Cache path: (-C): (null)
+[gin:query] Index: Index parse time (s): 0.000075
+[gin:query] Find: Total queries processed: 1
+[gin:query] Find: Total querying time (s): 0.000021
+[gin:query] Find: Queries per second: 47619.047619
+[gin:query] Find: Time per query (s): 0.000021
+[gin:query] Find: Number of matching forks: 2
+[gin:query] Find: Number of partial forks: 1
+[gin:query] Find: Number of matches: 3
+[gin:query] Find: Number of fork advances: 5
+[gin:query] Find: Number of fork advances per query: 5.000000
+
+=== MAIN QUERY FIND DEBUG ===
+Query: 'AAT', max_forks: -1, cache: NO
+Using default bootstrap (no cache)
+Calling gin_gin_query_find_bootstrapped with bootstrap_depth=2
+
+=== BOOTSTRAPPED QUERY DEBUG ===
+Bootstrap depth: 2, Initial forks: 1
+
+--- Iteration 0 (t=2) ---
+Forks before step: 1
+Using double rank step
+Forks after step: 2, Partial matches: 0
+
+--- Iteration 1 (t=1) ---
+Forks before step: 2
+Using double rank step
+Forks after step: 2, Partial matches: 1
+Bootstrap loop finished: forks=2, t=0
+Query completed. Paths: 2, Dead ends: 1
+AAT:(c:3):(mf:2,pf:1):(a:5)
+	(30,31)
+	(28,30)
+exit();

@@ -1,0 +1,92 @@
+[gin:query] Parsing reference index into data structures.
+[gin:query] Parsing and launching queries with 1 threads and 8 batch size.
+[gin:query] Params: Index file name (-r): res/graph_index_debug.gini
+[gin:query] Params: Query file name (-i): res/query.ginq
+[gin:query] Params: Read batch size (-b): 8
+[gin:query] Params: Threads (-j): 1
+[gin:query] Params: Maximum forks tracked (-m): -1
+[gin:query] Params: Maximum matches decoded (-M): -1
+[gin:query] Params: Cache path: (-C): (null)
+[gin:query] Index: Index parse time (s): 0.000062
+[gin:query] Find: Total queries processed: 1
+[gin:query] Find: Total querying time (s): 0.000027
+[gin:query] Find: Queries per second: 37037.037037
+[gin:query] Find: Time per query (s): 0.000027
+[gin:query] Find: Number of matching forks: 2
+[gin:query] Find: Number of partial forks: 1
+[gin:query] Find: Number of matches: 3
+[gin:query] Find: Number of fork advances: 5
+[gin:query] Find: Number of fork advances per query: 5.000000
+
+=== MAIN QUERY FIND DEBUG ===
+Query: 'AAT', max_forks: -1, cache: NO
+Using default bootstrap (no cache)
+Calling gin_gin_query_find_bootstrapped with bootstrap_depth=2
+
+=== BOOTSTRAPPED QUERY DEBUG ===
+Bootstrap depth: 2, Initial forks: 1
+
+--- Iteration 0 (t=2) ---
+Forks before step: 1
+Using double rank step
+
+=== DOUBLE RANK FORK & COMPACT DEBUG ===
+Query: AAT (position t=2)
+Current forks count: 1
+
+--- Double Rank Fork 0 ---
+  Current fork range: [38, 42) at position 1
+  Character at position 1: 'A'
+  After double rank advance: fork=[32, 33), precedence=[3, 6)
+  Precedence range size: 3
+  Querying IMT with range [2, 4]
+  IMT returned 1 intervals (R ranges):
+    R[0]: [1, 1] -> SA range [7, 8) (pos=1)
+  Total new forks created: 1
+
+Before compaction: 1 new forks
+New forks before compaction:
+  Fork[0]: [7, 8)
+After compaction: 1 merged forks
+Merged forks after compaction:
+  Merged[0]: [7, 8)
+Forks after step: 2, Partial matches: 0
+
+--- Iteration 1 (t=1) ---
+Forks before step: 2
+Using double rank step
+
+=== DOUBLE RANK FORK & COMPACT DEBUG ===
+Query: AAT (position t=1)
+Current forks count: 2
+
+--- Double Rank Fork 0 ---
+  Current fork range: [32, 33) at position 0
+  Character at position 0: 'A'
+  After double rank advance: fork=[31, 31), precedence=[2, 3)
+  Precedence range size: 1
+  Querying IMT with range [1, 1]
+  IMT returned 1 intervals (R ranges):
+    R[0]: [2, 4] -> SA range [8, 11) (pos=0)
+  Total new forks created: 1
+
+--- Double Rank Fork 1 ---
+  Current fork range: [27, 28) at position 0
+  Character at position 0: 'A'
+  After double rank advance: fork=[30, 31), precedence=[1, 1)
+  Precedence range size: 0
+  No precedence range found (c_0_lo >= c_0_hi)
+
+Before compaction: 1 new forks
+New forks before compaction:
+  Fork[0]: [8, 11)
+After compaction: 1 merged forks
+Merged forks after compaction:
+  Merged[0]: [8, 11)
+Forks after step: 2, Partial matches: 1
+Bootstrap loop finished: forks=2, t=0
+Query completed. Paths: 2, Dead ends: 1
+AAT:(c:3):(mf:2,pf:1):(a:5)
+	(30,31)
+	(28,30)
+exit();
